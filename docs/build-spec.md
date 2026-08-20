@@ -50,7 +50,7 @@ Score as a weighted sum. Missing structured data costs more than missing prose �
 **DISCOVERABLE (0–100)**
 - Parse `robots.txt` for explicit disallow rules against Googlebot, OAI-SearchBot, ClaudeBot, Claude-SearchBot, Claude-User, PerplexityBot
 - Check for a sitemap (referenced in `robots.txt`, at `/sitemap.xml`, or otherwise discoverable)
-- Fetch the homepage and 2–3 key pages (services/contact/booking) with each relevant bot user agent; flag blocks (403s, CAPTCHA redirects, WAF challenge pages)
+- Fetch the homepage and 2–3 key pages (services/contact/booking) using the honest, disclosed user agent defined for this product — never a spoofed bot identity, per the product integrity constraints below. Derive per-bot access from `robots.txt` rules plus block signals observed on this honest fetch (403s, CAPTCHA redirects, WAF challenge pages), and state in the report that access is inferred this way rather than tested per bot.
 - Flag response times slow enough that a bot with a limited fetch budget would likely abandon the page
 
 Report each check individually (not just a rolled-up number) so the gap report can cite specifics.
