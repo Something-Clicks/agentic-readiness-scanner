@@ -17,12 +17,6 @@ and Phase 4 (Payable) are not started. Per the rollout sequencing in the build s
 Phase 1's scoring should be validated against 15–20 real businesses before Phase 2
 begins.
 
-> **Blocked before scanning anyone else's site:** `https://somethingclicks.com/bot`
-> is a 404. That URL is in the user agent of every request the scanner makes, so
-> until it explains what the bot is, we are not actually disclosing anything. This
-> gates the 15–20 business validation above, not just production launch — see
-> [Prerequisite](#prerequisite-the-bot-disclosure-page-must-exist).
-
 ## Docs
 
 - [`docs/build-spec.md`](docs/build-spec.md) — full technical implementation spec, phase by phase. This is the source of truth for what to build — read it before writing code.
@@ -132,26 +126,22 @@ of it.
 
 ### Deploying to Vercel
 
-#### Prerequisite: the bot disclosure page must exist
+#### The bot disclosure page
 
-**The scanner must not be run against real businesses until
-`https://somethingclicks.com/bot` returns a real page. It is a 404 today.**
+`https://somethingclicks.com/bot` is live, and it needs to stay that way.
 
 That URL is carried in the user agent of every request the scanner makes. The whole
 premise of this product is an honest, *disclosed* identity — we ask business owners
 to let named crawlers through, and we identify ourselves rather than impersonating
-one. A site owner who sees an unfamiliar bot in their logs, looks up the URL it
-gave them, and lands on a 404 gets the opposite of disclosure. It is also the first
-thing a security-conscious host will check before deciding whether to allow or block
-us.
+one. A site owner who sees an unfamiliar bot in their logs and looks up the URL it
+gave them has to find an explanation there; it is also the first thing a
+security-conscious host checks before deciding whether to allow or block us.
 
-Scanning your own sites while building is fine. Pointing this at someone else's
-business before that page is live is not, and no amount of correct code makes it
-otherwise.
-
-The page needs to say, at minimum: what the bot is, who runs it, why it fetched
-their site, and how to contact a human about it. Building it is outside this
-repository's scope — it belongs with the website.
+So this is a standing constraint rather than a one-time task. If the page moves or
+comes down, or if `SCAN_USER_AGENT` is pointed at a different URL, that URL has to
+resolve to a page explaining what the bot is, who runs it, why it fetched their
+site, and how to reach a human about it. The page itself lives with the website,
+not in this repository.
 
 #### How it runs
 
