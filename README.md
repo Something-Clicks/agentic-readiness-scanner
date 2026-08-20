@@ -124,6 +124,42 @@ of it.
   "Biggest problem" line comes from where the path breaks.
 - **Payable** — never scored. Always the literal string `— roadmap`.
 
+### Deploying to Vercel
+
+Vercel invokes a handler per request rather than running a long-lived process, so
+`src/index.ts` — the file that calls `listen()` — is not what runs there. `api/index.ts`
+is the serverless entry point: it builds the same Express app once at module scope
+and exports it as a `(req, res)` handler, so there is one copy of the routing rather
+than two.
+
+`vercel.json` rewrites every path to that function and declares the function's limit:
+
+```json
+{
+  "functions": { "api/index.ts": { "maxDuration": 10 } },
+  "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
+}
+```
+
+**`maxDuration` and `SCAN_TIMEOUT_MS` are coupled.** A scan runs synchronously, so its
+budget has to fit inside the function's limit with room for cold start — 8s of scan
+inside a 10s function. If you raise one, raise the other; a test asserts the budget
+stays inside the declared limit so the two cannot drift apart silently.
+
+Set `SCAN_USER_AGENT` in the Vercel project's environment variables. The service
+refuses to start without an honest one, so a missing value fails loudly rather than
+quietly falling back to something that impersonates a crawler.
+
+Verify a preview deployment before pointing production at it:
+
+```bash
+curl "https://<preview-url>/health"
+curl "https://<preview-url>/scan?url=example.com&format=text"
+```
+
+`/health` confirms the function is wired up and reports the user agent it will fetch
+with. The scan confirms the whole path works end to end under the real timeout.
+
 ### Tests
 
 ```bash
