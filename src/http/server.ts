@@ -79,7 +79,7 @@ function respondError(res: Response, status: number, body: Record<string, unknow
 
 function readTier(req: Request): Tier {
   const raw = String(req.query.tier ?? (req.body as { tier?: unknown })?.tier ?? "free").toLowerCase();
-  return raw === "full" || raw === "paid" || raw === "29" ? "full" : "free";
+  return raw === "full" || raw === "paid" || raw === "30" ? "full" : "free";
 }
 
 function readFormat(req: Request): "json" | "text" {

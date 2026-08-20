@@ -3,7 +3,7 @@ import type { CheckResult, PillarResult, ScanResult, Tier } from "../types.ts";
 /**
  * The plain-text report. The free-tier block is byte-for-byte the layout in
  * build-spec.md's Phase 1 section — do not restyle it without changing the spec.
- * The $29 tier appends the itemized gap report behind each score.
+ * The $30 tier appends the itemized gap report behind each score.
  */
 
 const LABEL_WIDTH = 15;

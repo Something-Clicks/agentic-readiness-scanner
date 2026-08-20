@@ -8,7 +8,7 @@ This is the build spec for the full product described in Section 7 of the busine
 
 ## Phase 1 — Diagnostic
 
-**Purpose:** powers the free and $29 Scan tiers.
+**Purpose:** powers the free and $30 Scan tiers.
 
 ### Input / Output
 
@@ -33,7 +33,7 @@ ACTIONS
 3. Connect structured service information
 ```
 
-Free tier shows the four scores and the biggest problem. The $29 tier unlocks the full itemized gap report behind each score.
+Free tier shows the four scores and the biggest problem. The $30 tier unlocks the full itemized gap report behind each score.
 
 ### Scoring logic
 
@@ -137,7 +137,7 @@ Do not build in assumptions about margin percentage, minutes of labor per Fix, C
 
 ## Phase 3 — Monitoring
 
-**Purpose:** powers the $49/month Monitor tier.
+**Purpose:** powers the $50/month Monitor tier.
 
 ### Components
 
