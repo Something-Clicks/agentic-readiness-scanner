@@ -161,14 +161,29 @@ is the serverless entry point: it builds the same Express app once at module sco
 and exports it as a `(req, res)` handler, so there is one copy of the routing rather
 than two.
 
-`vercel.json` rewrites every path to that function and declares the function's limit:
+`vercel.json` rewrites every path to that function, declares the function's limit, and
+names an output directory:
 
 ```json
 {
   "functions": { "api/index.ts": { "maxDuration": 10 } },
-  "rewrites": [{ "source": "/(.*)", "destination": "/api" }]
+  "rewrites": [{ "source": "/(.*)", "destination": "/api" }],
+  "outputDirectory": "public"
 }
 ```
+
+**`outputDirectory` and `public/` are not optional here**, even though this project
+serves no static site. Vercel's zero-config build runs `@vercel/static-build` whenever
+`package.json` has a `build` script — which this one does — and that builder then
+requires the output directory to exist and be non-empty, failing the deploy with
+`No Output Directory named "public" found` otherwise. `public/index.html` is a small
+page describing the API; it is what a browser gets at `/`, while every other path
+falls through the rewrite to the function.
+
+Setting `"outputDirectory": ""` also makes the build pass, and is the wrong fix: it
+turns the whole repository into the static output, publishing `src/`, `test/`, and
+`docs/` at guessable URLs. A test asserts the directory is declared, non-empty, and
+not `""`.
 
 **`maxDuration` and `SCAN_TIMEOUT_MS` are coupled.** A scan runs synchronously, so its
 budget has to fit inside the function's limit with room for cold start — 8s of scan
