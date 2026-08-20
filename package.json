@@ -1,0 +1,33 @@
+{
+  "name": "agentic-readiness-scanner",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Scan \u2014 diagnoses whether AI agents can read, find, and act on a local business website.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "node --experimental-strip-types --watch src/index.ts",
+    "scan": "node --experimental-strip-types src/cli.ts",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "node --experimental-strip-types --test test/*.test.ts"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "robots-parser": "^3.0.1",
+    "sitemap": "^8.0.0",
+    "undici": "^7.29.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  }
+}
