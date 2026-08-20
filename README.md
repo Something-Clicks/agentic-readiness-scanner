@@ -6,9 +6,11 @@ Something Clicks helps local businesses become understandable, discoverable, and
 
 ## Products
 
-- **Scan** — diagnoses whether AI agents can find, understand, and act on a business website. Scores Readable / Discoverable / Callable; reports Payable as roadmap.
-- **Fix** — implements the corrections Scan identifies, within a fixed, standardized scope. See `docs/build-spec.md` for the exact scope boundaries and fixability classification.
-- **Monitor** — continuously checks for changes that affect machine readability, discoverability, or actionability.
+- **Scan — $30 one-time.** Diagnoses whether AI agents can find, understand, and act on a business website. Scores Readable / Discoverable / Callable; reports Payable as roadmap. A free tier shows the four scores and the biggest problem; $30 unlocks the itemized gap report behind each score.
+- **Fix — $300 one-time.** Implements the corrections Scan identifies, within a fixed, standardized scope. See `docs/build-spec.md` for the exact scope boundaries and fixability classification.
+- **Monitor — $50/month.** Continuously checks for changes that affect machine readability, discoverability, or actionability.
+
+$30 to see what's wrong → $300 to fix it → $50/month to keep it monitored.
 
 ## Status
 
@@ -43,7 +45,7 @@ cp .env.example .env
 
 ```bash
 npm run scan -- https://example.com          # free tier: four scores and the biggest problem
-npm run scan -- https://example.com --full   # $29 tier: every check, itemized
+npm run scan -- https://example.com --full   # $30 tier: every check, itemized
 npm run scan -- https://example.com --full --json
 ```
 

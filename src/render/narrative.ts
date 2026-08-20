@@ -213,7 +213,7 @@ const DISCOVERABLE_ACTIONS: Record<string, string> = {
   "discoverable.response_time": "Cut page response time",
 };
 
-/** Every check with points left on it, worst first — the body of the $29 gap report. */
+/** Every check with points left on it, worst first — the body of the $30 gap report. */
 export function rankedGaps(pillars: PillarResult[]): CheckResult[] {
   return pillars
     .flatMap((pillar) => pillar.checks)

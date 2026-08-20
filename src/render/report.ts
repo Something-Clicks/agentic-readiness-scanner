@@ -4,7 +4,7 @@ import { rankedGaps } from "./narrative.ts";
 
 /**
  * Tier shaping. The free tier shows the four lines and the biggest problem. The
- * $29 tier unlocks the itemized gap report behind each score — same scan, more of
+ * $30 tier unlocks the itemized gap report behind each score — same scan, more of
  * the result. We never run a lesser scan for the free tier; we just show less of it.
  */
 export function shapeReport(result: ScanResult, tier: Tier): Record<string, unknown> {

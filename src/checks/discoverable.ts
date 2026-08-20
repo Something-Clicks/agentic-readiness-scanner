@@ -6,7 +6,7 @@ import { listPhrase } from "./readable.ts";
 /**
  * DISCOVERABLE — can the crawlers that feed search and AI answers actually get in?
  *
- * Weighted sum, 100 points. Each check is reported individually so the $29 gap
+ * Weighted sum, 100 points. Each check is reported individually so the $30 gap
  * report can cite the specific rule, URL, or status code behind the number.
  */
 const WEIGHTS = {
