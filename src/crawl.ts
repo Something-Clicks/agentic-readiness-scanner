@@ -1,5 +1,6 @@
 import { config } from "./config.ts";
 import { fetchPage, type FetchOutcome } from "./fetcher.ts";
+import type { ScanBudget } from "./budget.ts";
 import { buildPageModel, type PageModel } from "./extract/page.ts";
 import type { PageRole } from "./types.ts";
 
@@ -43,8 +44,11 @@ export interface CrawlResult {
   origin: string;
 }
 
-export async function crawl(startUrl: string): Promise<CrawlResult | { error: string; outcome: FetchOutcome }> {
-  const homepageOutcome = await fetchPage(startUrl);
+export async function crawl(
+  startUrl: string,
+  budget: ScanBudget,
+): Promise<CrawlResult | { error: string; outcome: FetchOutcome }> {
+  const homepageOutcome = await fetchPage(startUrl, budget);
 
   if (homepageOutcome.error) {
     return { error: homepageOutcome.error, outcome: homepageOutcome };
@@ -79,8 +83,18 @@ export async function crawl(startUrl: string): Promise<CrawlResult | { error: st
 
   // Sequential on purpose: this is one business's site, and hammering it in
   // parallel is both rude and a good way to trip the WAF we are trying to measure.
-  for (const target of targets) {
-    const outcome = await fetchPage(target.url);
+  for (const [index, target] of targets.entries()) {
+    if (budget.isExhausted()) {
+      // Say which pages we never got to. A page we did not read is not a page
+      // with nothing on it, and the report must not imply otherwise.
+      const missed = targets.slice(index).map((remaining) => remaining.url);
+      budget.skip({
+        what: `${missed.length} key ${missed.length === 1 ? "page" : "pages"} (${missed.join(", ")})`,
+        reason: "out-of-time",
+      });
+      break;
+    }
+    const outcome = await fetchPage(target.url, budget);
     outcomes.push({ outcome, role: target.role });
     if (!outcome.error && outcome.status === 200) {
       pages.push(buildPageModel(outcome, target.role));

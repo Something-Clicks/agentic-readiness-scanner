@@ -1,5 +1,6 @@
 import { EnvHttpProxyAgent, setGlobalDispatcher } from "undici";
 import { config } from "./config.ts";
+import type { ScanBudget } from "./budget.ts";
 
 // Honour HTTP_PROXY / HTTPS_PROXY / NO_PROXY. Node's global fetch ignores them on
 // its own, and plenty of deployments put an egress proxy in front of the scanner.
@@ -27,8 +28,9 @@ export interface FetchOutcome {
  * place that sets the user agent. See config.ts for why it is never another
  * platform's crawler string.
  */
-export async function fetchPage(url: string): Promise<FetchOutcome> {
+export async function fetchPage(url: string, budget?: ScanBudget): Promise<FetchOutcome> {
   const started = Date.now();
+  const timeoutMs = budget ? budget.timeoutForFetch() : config.fetchTimeoutMs;
   const base: FetchOutcome = {
     requestedUrl: url,
     finalUrl: url,
@@ -46,7 +48,7 @@ export async function fetchPage(url: string): Promise<FetchOutcome> {
   try {
     const response = await fetch(url, {
       redirect: "follow",
-      signal: AbortSignal.timeout(config.fetchTimeoutMs),
+      signal: AbortSignal.timeout(timeoutMs),
       headers: {
         "user-agent": config.userAgent,
         accept: "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7",
@@ -80,7 +82,7 @@ export async function fetchPage(url: string): Promise<FetchOutcome> {
     return {
       ...base,
       elapsedMs: Date.now() - started,
-      error: describeFetchError(error),
+      error: describeFetchError(error, timeoutMs),
     };
   }
 }
@@ -113,7 +115,7 @@ async function readBody(response: Response): Promise<{ body: string; truncated: 
  * Distinguish "the site said no" from "the site is down". Written in the brand's
  * register: say what happened, not what category of exception was thrown.
  */
-function describeFetchError(error: unknown): string {
+function describeFetchError(error: unknown, timeoutMs: number): string {
   const outer = error instanceof Error ? error.message : String(error);
   const name = error instanceof Error ? error.name : "";
   const causeError = (error as { cause?: { code?: unknown; message?: unknown } })?.cause;
@@ -124,7 +126,7 @@ function describeFetchError(error: unknown): string {
   const message = outer === "fetch failed" && causeMessage ? causeMessage : outer;
 
   if (name === "TimeoutError" || message.includes("timed out")) {
-    return `No response within ${Math.round(config.fetchTimeoutMs / 1000)} seconds.`;
+    return `No response within ${formatSeconds(timeoutMs)} seconds.`;
   }
   if (cause === "ENOTFOUND" || cause === "EAI_AGAIN") {
     return "That domain does not resolve. Check the address for a typo, or whether DNS is set up.";
@@ -169,4 +171,9 @@ function detectBlock(outcome: FetchOutcome): string | null {
     }
   }
   return null;
+}
+
+function formatSeconds(ms: number): string {
+  const seconds = ms / 1000;
+  return seconds >= 1 ? String(Math.round(seconds)) : seconds.toFixed(1);
 }

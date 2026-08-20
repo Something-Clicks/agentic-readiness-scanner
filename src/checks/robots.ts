@@ -17,6 +17,8 @@ import { Readable } from "node:stream";
 import { parseSitemap } from "sitemap";
 import * as cheerio from "cheerio";
 import { fetchPage } from "../fetcher.ts";
+import { config } from "../config.ts";
+import type { ScanBudget } from "../budget.ts";
 
 /**
  * The named agents the spec asks us to report on. We check what robots.txt says
@@ -48,6 +50,12 @@ export interface RobotsReport {
   url: string;
   status: number | null;
   exists: boolean;
+  /**
+   * False when the scan ran out of time before reading robots.txt. Distinct from
+   * exists=false, which means we looked and there was nothing there — "no rules"
+   * and "we never checked" must not score the same.
+   */
+  checked: boolean;
   fetchError: string | null;
   /** Raw robots.txt body, capped for reporting. */
   body: string;
@@ -59,14 +67,36 @@ export interface RobotsReport {
   contentTypeWarning: string | null;
 }
 
-export async function checkRobots(origin: string, scannedPaths: string[]): Promise<RobotsReport> {
+export async function checkRobots(
+  origin: string,
+  scannedPaths: string[],
+  budget: ScanBudget,
+): Promise<RobotsReport> {
   const robotsUrl = new URL("/robots.txt", origin).toString();
-  const outcome = await fetchPage(robotsUrl);
+
+  if (budget.isExhausted()) {
+    budget.skip({ what: `robots.txt at ${robotsUrl}`, reason: "out-of-time" });
+    return {
+      url: robotsUrl,
+      status: null,
+      exists: false,
+      checked: false,
+      fetchError: null,
+      body: "",
+      sitemapUrls: [],
+      agentAccess: [],
+      blocksEverything: false,
+      contentTypeWarning: null,
+    };
+  }
+
+  const outcome = await fetchPage(robotsUrl, budget);
 
   const report: RobotsReport = {
     url: robotsUrl,
     status: outcome.status,
     exists: false,
+    checked: true,
     fetchError: outcome.error,
     body: "",
     sitemapUrls: [],
@@ -124,6 +154,10 @@ export interface SitemapReport {
   error: string | null;
   /** Locations we tried and what came back, so the full report can show the attempts. */
   attempts: Array<{ url: string; status: number | null; result: string }>;
+  /** Declared locations we deliberately did not fetch, and why. */
+  notProbed: Array<{ url: string; reason: string }>;
+  /** How many locations were declared or guessed in total, before any cap. */
+  candidatesDeclared: number;
 }
 
 const CONVENTIONAL_SITEMAP_PATHS = [
@@ -139,6 +173,7 @@ export async function checkSitemap(
   origin: string,
   robotsSitemapUrls: string[],
   htmlLinkedSitemaps: string[],
+  budget: ScanBudget,
 ): Promise<SitemapReport> {
   const report: SitemapReport = {
     found: false,
@@ -151,6 +186,8 @@ export async function checkSitemap(
     childSitemapCount: 0,
     error: null,
     attempts: [],
+    notProbed: [],
+    candidatesDeclared: 0,
   };
 
   const candidates: Array<{ url: string; via: NonNullable<SitemapReport["discoveredVia"]> }> = [
@@ -162,17 +199,54 @@ export async function checkSitemap(
     })),
   ];
 
+  // Dedupe first, then cap. A site can list any number of Sitemap: lines, and
+  // probing every one of them sequentially is how a scan turns into a thin,
+  // mostly-timed-out report. Ordering above puts the authoritative locations
+  // first — robots.txt, then HTML links, then conventional guesses — so the cap
+  // drops the least likely candidates rather than an arbitrary slice.
+  const deduped: typeof candidates = [];
   const seen = new Set<string>();
   for (const candidate of candidates) {
     if (seen.has(candidate.url)) continue;
     seen.add(candidate.url);
+    deduped.push(candidate);
+  }
+  report.candidatesDeclared = deduped.length;
+
+  const probable = deduped.slice(0, config.maxSitemapCandidates);
+  for (const dropped of deduped.slice(config.maxSitemapCandidates)) {
+    report.notProbed.push({
+      url: dropped.url,
+      reason: `not checked — this scan probes at most ${config.maxSitemapCandidates} sitemap locations`,
+    });
+  }
+  if (report.notProbed.length > 0) {
+    budget.skip({
+      what: `${report.notProbed.length} further sitemap ${report.notProbed.length === 1 ? "location" : "locations"} beyond the first ${config.maxSitemapCandidates}`,
+      reason: "candidate-limit",
+    });
+  }
+
+  for (const [index, candidate] of probable.entries()) {
     // Gzipped sitemaps need decompression we do not do here; note and skip.
     if (candidate.url.endsWith(".gz")) {
       report.attempts.push({ url: candidate.url, status: null, result: "skipped — gzipped sitemap not read" });
       continue;
     }
 
-    const outcome = await fetchPage(candidate.url);
+    if (budget.isExhausted()) {
+      const missed = probable.slice(index);
+      for (const remaining of missed) {
+        report.notProbed.push({ url: remaining.url, reason: "not checked — the scan ran out of time" });
+      }
+      budget.skip({
+        what: `${missed.length} sitemap ${missed.length === 1 ? "location" : "locations"} (${missed.map((m) => m.url).join(", ")})`,
+        reason: "out-of-time",
+      });
+      break;
+    }
+
+    const outcome = await fetchPage(candidate.url, budget);
     if (outcome.error) {
       report.attempts.push({ url: candidate.url, status: null, result: outcome.error });
       continue;
