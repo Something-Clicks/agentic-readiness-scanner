@@ -6,9 +6,15 @@ This covers only what code/UI needs (logo, color, voice for generated copy). Ful
 
 **Something Clicks.** Established — domain, logo, and existing infrastructure are already built around this name. Not up for reconsideration.
 
+## Product names
+
+**Scan, Fix, Monitor** — the only names used on the website, in checkout, in the app, and in this codebase. Do not use anything longer or more descriptive in these contexts.
+
+**Exception — Google Business Profile product listings only:** use "AI Visibility Scan," "AI Visibility Fix," "AI Visibility Monitor." GBP listings need a descriptive standalone name since a bare single word doesn't read as a product outside the context of the site. This naming is scoped to GBP only — nothing else changes.
+
 ## Logo
 
-`assets/logo.png` — a location pin merged with a cursor arrow. Reads as "click" + "location," a literal match for the name.
+`docs/logo.png` — a location pin merged with a cursor arrow. Reads as "click" + "location," a literal match for the name.
 
 ## Color
 
@@ -32,4 +38,4 @@ Grounded, literal, no jargon, no fluff. This applies to any customer-facing copy
 
 ## Explicitly not adopted here
 
-An earlier brand-strategy pass (Alina Wheeler five-phase framework) proposed renaming the business (e.g., "Incoming," "Booked Solid," "Intercept") and referenced a different pricing structure ($299 audit / $499 / $999 monthly) than what's actually in use (Scan free/$29, Fix $299, Monitor $49/month, Multi-Location $1,499/month). That naming direction and pricing don't match the current business — not incorporated. The voice/tone guidance from that pass is the one piece that held up independent of the naming, and is reflected above.
+An earlier brand-strategy pass (Alina Wheeler five-phase framework) proposed renaming the business (e.g., "Incoming," "Booked Solid," "Intercept") and referenced a different pricing structure ($299 audit / $499 / $999 monthly) than what's actually in use (Scan free/$29, Fix $299, Monitor $49/month — the complete offer ladder, no higher tier). That naming direction and pricing don't match the current business — not incorporated. The voice/tone guidance from that pass is the one piece that held up independent of the naming, and is reflected above.
