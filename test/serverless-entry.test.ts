@@ -95,6 +95,35 @@ test("a bare /api request reaches the app as /", async () => {
   assert.equal(status, 404);
 });
 
+/**
+ * Vercel's zero-config build runs @vercel/static-build whenever package.json has a
+ * build script, and that builder then requires the output directory to exist and be
+ * non-empty — it fails the deploy otherwise. These mirror its own three checks
+ * (validateDistDir in @vercel/static-build), so the requirement is caught here
+ * rather than by a failed deploy.
+ */
+test("vercel.json declares an output directory that exists and is not empty", async () => {
+  const { readFile, stat, readdir } = await import("node:fs/promises");
+  const root = new URL("../", import.meta.url);
+  const vercelConfig = JSON.parse(await readFile(new URL("vercel.json", root), "utf8")) as {
+    outputDirectory?: string;
+  };
+
+  const outputDirectory = vercelConfig.outputDirectory;
+  assert.ok(outputDirectory, "vercel.json must declare outputDirectory");
+  assert.notEqual(
+    outputDirectory,
+    "",
+    'outputDirectory must not be "" — that makes the whole repository the static output, publishing src/ and docs/',
+  );
+
+  const directory = new URL(`${outputDirectory}/`, root);
+  const stats = await stat(directory);
+  assert.ok(stats.isDirectory(), `${outputDirectory} exists but is not a directory`);
+  const entries = await readdir(directory);
+  assert.ok(entries.length > 0, `${outputDirectory} is empty, which fails the build`);
+});
+
 test("the scan budget fits inside the function's declared maxDuration", async () => {
   const { readFile } = await import("node:fs/promises");
   const vercelConfig = JSON.parse(await readFile(new URL("../vercel.json", import.meta.url), "utf8")) as {

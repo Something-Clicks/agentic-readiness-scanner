@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scan — Something Clicks</title>
+<style>
+  :root { color-scheme: light dark; --ink: #14161a; --bg: #fff; --indigo: #2852FC; --muted: #5b6270; }
+  @media (prefers-color-scheme: dark) { :root { --ink: #e9ecf2; --bg: #14161a; --muted: #9aa3b2; } }
+  body { margin: 0; padding: 3rem 1.5rem; background: var(--bg); color: var(--ink);
+         font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 34rem; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 .5rem; color: var(--indigo); }
+  p { margin: 0 0 1rem; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
+  ul { padding-left: 1.1rem; }
+  li { margin-bottom: .4rem; }
+  .muted { color: var(--muted); font-size: .9rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Scan</h1>
+  <p>This is the diagnostic API for Something Clicks. It checks whether AI agents can
+     read, find, and act on a local business website.</p>
+  <ul>
+    <li><code>GET /scan?url=…</code> — run a scan. Add <code>&amp;tier=full</code> for the
+        itemized report, <code>&amp;format=text</code> for plain text.</li>
+    <li><code>GET /health</code> — service status and the user agent scans are sent with.</li>
+  </ul>
+  <p class="muted">Every request this service makes identifies itself honestly. It never
+     sends another platform's crawler user agent.</p>
+</main>
+</body>
+</html>
