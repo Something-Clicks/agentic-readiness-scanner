@@ -23,7 +23,10 @@ begins.
 
 ## Getting started
 
-Phase 1 (Scan) is built. Node 20 or newer.
+Phase 1 (Scan) is built. Node 22.6 or newer — the `scan`, `dev`, and `test` scripts
+run the TypeScript sources directly via `--experimental-strip-types`, which Node
+added in 22.6. Compiled output from `npm run build` runs on older Node, but the
+development and CLI workflow below needs 22.6+.
 
 ```bash
 npm install
