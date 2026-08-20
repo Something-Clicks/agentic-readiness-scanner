@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      # Report every version's result, rather than cancelling the rest on the
+      # first failure — a break on one Node version is worth seeing on its own.
+      fail-fast: false
+      matrix:
+        # The scan/dev/test scripts run the TypeScript sources through
+        # --experimental-strip-types, which Node added in 22.6.
+        node-version: ['22.x', '24.x']
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      # The suite starts fixture sites on 127.0.0.1 and scans those. It makes no
+      # outbound requests, so it does not depend on the runner's egress.
+      - run: npm test
+
+      - run: npm run build
