@@ -63,9 +63,22 @@ curl -X POST http://localhost:3000/scan \
 | `GET /health` | Liveness, plus the user agent this instance fetches with. |
 
 A scan runs synchronously and returns in the same request. There is no queue and no
-background worker — one request, one scan, one response. Expect a few seconds per
-scan, since it fetches the homepage, up to three key pages, `robots.txt`, and the
-sitemap, one at a time so it does not hammer a small business's server.
+background worker — one request, one scan, one response. It fetches the homepage, up
+to three key pages, `robots.txt`, and the sitemap, one at a time so it does not
+hammer a small business's server.
+
+The whole scan is bounded by `SCAN_TIMEOUT_MS` (default 8s), which is also the
+ceiling on the response — the default is sized to fit inside a 10-second serverless
+function limit with room for cold start. Two rules keep a slow site from turning
+into a slow scan:
+
+- Every fetch is capped at whatever is left of the budget, not just its own timeout.
+- Sitemap probing stops after `SCAN_MAX_SITEMAP_CANDIDATES` locations (default 5),
+  however many a site declares.
+
+Anything cut short is named in the report's "what this scan did not cover" section
+and left out of the score, rather than counted as a check that failed. A check we
+could not run must never read as a check that passed.
 
 ### What comes back
 

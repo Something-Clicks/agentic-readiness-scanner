@@ -34,8 +34,10 @@ export function scoreDiscoverable(
 
   return {
     name: "DISCOVERABLE",
-    // checkRobotsFile is reported but not scored (possible = 0), so this still totals 100.
-    score: Math.max(0, Math.min(100, Math.round((earned / Math.max(possible, 1)) * 100))),
+    // Checks reported but not scored carry possible = 0 — either by design
+    // (checkRobotsFile) or because we could not run them. Scoring over the weight we
+    // actually verified rescales the pillar instead of counting unchecked as failed.
+    score: possible === 0 ? 0 : Math.max(0, Math.min(100, Math.round((earned / possible) * 100))),
     checks,
     penalties: [],
   };
@@ -43,6 +45,25 @@ export function scoreDiscoverable(
 
 function checkAgentAccess(robots: RobotsReport): CheckResult {
   const possible = WEIGHTS.agentAccess;
+
+  // We never read robots.txt, so we know nothing about who is allowed in. Score it
+  // out of zero rather than out of 35: an unchecked crawler is not an allowed one,
+  // and awarding full marks here would be the most misleading thing this report
+  // could do. Dropping the weight rescales the pillar over what we did verify.
+  if (!robots.checked) {
+    return {
+      id: "discoverable.agent_access",
+      label: "Crawler access in robots.txt",
+      earned: 0,
+      possible: 0,
+      status: "partial",
+      finding:
+        "We did not get to robots.txt before this scan ran out of time, so we cannot say which crawlers are allowed in. This check is left out of the score rather than guessed at.",
+      recommendation: "Run the scan again. If it keeps timing out, the site is slow enough that crawlers will struggle with it too.",
+      evidence: { robotsTxtUrl: robots.url, checked: false },
+    };
+  }
+
   const blocked = robots.agentAccess.filter((access) => !access.homepageAllowed);
   const partiallyBlocked = robots.agentAccess.filter(
     (access) => access.homepageAllowed && access.disallowedPaths.length > 0,
@@ -106,7 +127,11 @@ function checkRobotsFile(robots: RobotsReport): CheckResult {
   let recommendation: string | undefined;
   let status: CheckStatus = "pass";
 
-  if (robots.contentTypeWarning) {
+  if (!robots.checked) {
+    finding = "We did not read robots.txt — the scan ran out of time first.";
+    recommendation = "Run the scan again to check it.";
+    status = "partial";
+  } else if (robots.contentTypeWarning) {
     finding = robots.contentTypeWarning;
     recommendation = "Serve /robots.txt as plain text, or remove the catch-all route that is answering for it.";
     status = "partial";
@@ -143,6 +168,26 @@ function checkSitemap(sitemap: SitemapReport, robots: RobotsReport): CheckResult
   const possible = WEIGHTS.sitemap;
 
   if (!sitemap.found) {
+    // "We looked everywhere and found nothing" is a finding. "We stopped looking"
+    // is not the same thing, and must not be scored as one.
+    const unfinished = sitemap.notProbed.length > 0;
+    if (unfinished) {
+      const outOfTime = sitemap.notProbed.some((entry) => /ran out of time/.test(entry.reason));
+      return {
+        id: "discoverable.sitemap",
+        label: "Sitemap",
+        earned: 0,
+        possible: 0,
+        status: "partial",
+        finding:
+          `We checked ${sitemap.attempts.length} sitemap location${sitemap.attempts.length === 1 ? "" : "s"} without finding one, and left ${sitemap.notProbed.length} unchecked ` +
+          `${outOfTime ? "when the scan ran out of time" : "because this scan probes a fixed number of locations"}. ` +
+          "Since we did not finish looking, this is left out of the score rather than counted as a missing sitemap.",
+        recommendation:
+          "Point robots.txt at your sitemap with a single Sitemap: line so it is found on the first look.",
+        evidence: { attempts: sitemap.attempts, notProbed: sitemap.notProbed, candidatesDeclared: sitemap.candidatesDeclared },
+      };
+    }
     return {
       id: "discoverable.sitemap",
       label: "Sitemap",
@@ -153,7 +198,7 @@ function checkSitemap(sitemap: SitemapReport, robots: RobotsReport): CheckResult
         "There is no sitemap we could find. Crawlers have to discover your pages by following links, so anything that is not linked from the homepage may never be read.",
       recommendation:
         "Publish a sitemap.xml listing every page you want found, and add a Sitemap: line to robots.txt pointing at it.",
-      evidence: { attempts: sitemap.attempts },
+      evidence: { attempts: sitemap.attempts, candidatesDeclared: sitemap.candidatesDeclared },
     };
   }
 
@@ -244,9 +289,14 @@ function checkReachability(pages: PageSummary[]): CheckResult {
 
 function checkResponseTime(pages: PageSummary[]): CheckResult {
   const possible = WEIGHTS.responseTime;
-  const timed = pages.filter((page) => page.status !== null);
 
-  if (timed.length === 0) {
+  // A page that never answered is not missing data — it is the worst response time
+  // there is. Excluding timeouts here would mean a site that stalls on everything
+  // scores better than one that is merely slow.
+  const answered = pages.filter((page) => page.status !== null);
+  const timedOut = pages.filter((page) => page.status === null && page.error);
+
+  if (answered.length === 0 && timedOut.length === 0) {
     return {
       id: "discoverable.response_time",
       label: "Response time",
@@ -258,32 +308,59 @@ function checkResponseTime(pages: PageSummary[]): CheckResult {
     };
   }
 
-  const slowest = Math.max(...timed.map((page) => page.elapsedMs));
-  const average = Math.round(timed.reduce((sum, page) => sum + page.elapsedMs, 0) / timed.length);
-  const verySlow = timed.filter((page) => page.elapsedMs >= config.verySlowResponseMs);
-  const slow = timed.filter(
+  if (answered.length === 0) {
+    return {
+      id: "discoverable.response_time",
+      label: "Response time",
+      earned: 0,
+      possible,
+      status: "fail",
+      finding: `None of the ${timedOut.length} pages we requested answered before we gave up waiting. A crawler does not wait longer than we did.`,
+      recommendation:
+        "Get first-byte time under a second — caching, a CDN, or fewer server-side calls before the HTML starts sending.",
+      evidence: { pages },
+    };
+  }
+
+  const slowest = Math.max(...answered.map((page) => page.elapsedMs));
+  const average = Math.round(answered.reduce((sum, page) => sum + page.elapsedMs, 0) / answered.length);
+  const verySlow = answered.filter((page) => page.elapsedMs >= config.verySlowResponseMs);
+  const slow = answered.filter(
     (page) => page.elapsedMs >= config.slowResponseMs && page.elapsedMs < config.verySlowResponseMs,
   );
 
+  const total = answered.length + timedOut.length;
   let earned = possible;
-  earned -= (verySlow.length / timed.length) * possible;
-  earned -= (slow.length / timed.length) * possible * 0.5;
+  // A timeout costs the full share for that page.
+  earned -= (timedOut.length / total) * possible;
+  earned -= (verySlow.length / total) * possible;
+  earned -= (slow.length / total) * possible * 0.5;
 
-  const seconds = (ms: number) => (ms / 1000).toFixed(1);
-
-  if (verySlow.length === 0 && slow.length === 0) {
+  if (timedOut.length === 0 && verySlow.length === 0 && slow.length === 0) {
     return {
       id: "discoverable.response_time",
       label: "Response time",
       earned: possible,
       possible,
       status: "pass",
-      finding: `Pages came back in ${seconds(average)} seconds on average, slowest ${seconds(slowest)}. Fast enough that a crawler working through a budget will finish the page.`,
-      evidence: { averageMs: average, slowestMs: slowest, pages },
+      finding: `Pages came back in ${duration(average)} on average, slowest ${duration(slowest)}. Fast enough that a crawler working through a budget will finish the page.`,
+      evidence: { averageMs: average, slowestMs: slowest, timedOut: timedOut.length, pages },
     };
   }
 
-  const affected = [...verySlow, ...slow];
+  const parts: string[] = [];
+  if (timedOut.length > 0) {
+    parts.push(
+      `${timedOut.length} of ${total} pages never answered at all (${timedOut.map((page) => page.url).join(", ")})`,
+    );
+  }
+  const slowCount = verySlow.length + slow.length;
+  if (slowCount > 0) {
+    parts.push(
+      `${slowCount} of ${total} took over ${duration(config.slowResponseMs)} to respond (slowest ${duration(slowest)}, on ${answered.find((page) => page.elapsedMs === slowest)?.url})`,
+    );
+  }
+
   return {
     id: "discoverable.response_time",
     label: "Response time",
@@ -291,12 +368,17 @@ function checkResponseTime(pages: PageSummary[]): CheckResult {
     possible,
     status: statusFor(earned, possible),
     finding:
-      `${affected.length} of ${timed.length} pages took over ${seconds(config.slowResponseMs)} seconds to respond (slowest: ${seconds(slowest)} seconds, on ${timed.find((p) => p.elapsedMs === slowest)?.url}). ` +
+      `${parts.join(", and ")}. ` +
       `Crawlers work through a fixed budget of time per site. Slow pages get abandoned partway, and a half-read page is indexed as a half-read page.`,
     recommendation:
       "Get first-byte time under a second — caching, a CDN, or fewer server-side calls before the HTML starts sending.",
-    evidence: { averageMs: average, slowestMs: slowest, pages },
+    evidence: { averageMs: average, slowestMs: slowest, timedOut: timedOut.length, pages },
   };
+}
+
+/** Sub-second timings read as "0.0 seconds", which looks like a bug. Show milliseconds. */
+function duration(ms: number): string {
+  return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)} seconds`;
 }
 
 function statusFor(earned: number, possible: number): CheckStatus {

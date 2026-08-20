@@ -1,5 +1,6 @@
 import { config, PAYABLE_LINE } from "./config.ts";
 import { crawl } from "./crawl.ts";
+import { ScanBudget } from "./budget.ts";
 import { extractBusinessFacts } from "./extract/business.ts";
 import { scoreReadable } from "./checks/readable.ts";
 import { scoreDiscoverable } from "./checks/discoverable.ts";
@@ -64,7 +65,11 @@ export async function runScan(inputUrl: string): Promise<ScanResult> {
   const startedAt = Date.now();
   const requestedUrl = normalizeUrl(inputUrl);
 
-  const crawled = await crawl(requestedUrl);
+  // One wall-clock budget for the whole scan. Phase 1 is synchronous, so this is
+  // also the ceiling on the HTTP response.
+  const budget = new ScanBudget();
+
+  const crawled = await crawl(requestedUrl, budget);
   if ("error" in crawled) {
     throw new ScanError(`We could not read ${requestedUrl}. ${crawled.error}`, {
       url: requestedUrl,
@@ -87,8 +92,8 @@ export async function runScan(inputUrl: string): Promise<ScanResult> {
   }));
 
   const scannedPaths = pageSummaries.map((page) => page.url);
-  const robots = await checkRobots(origin, scannedPaths);
-  const sitemap = await checkSitemap(origin, robots.sitemapUrls, htmlLinkedSitemaps);
+  const robots = await checkRobots(origin, scannedPaths, budget);
+  const sitemap = await checkSitemap(origin, robots.sitemapUrls, htmlLinkedSitemaps, budget);
 
   const facts = extractBusinessFacts(pages);
   const readable = scoreReadable(pages, facts);
@@ -113,6 +118,21 @@ export async function runScan(inputUrl: string): Promise<ScanResult> {
   limitations.push(
     `Crawler access is read from the site's robots.txt rules for each named agent. This scan never sends another platform's user agent — every request identified itself as ${config.userAgent}.`,
   );
+
+  // Anything the budget cut short is named here. A check we skipped is not a check
+  // that passed, and the report has to be able to tell the customer which is which.
+  for (const work of budget.skippedWork()) {
+    limitations.push(
+      work.reason === "out-of-time"
+        ? `We did not check ${work.what}. The scan hit its ${(budget.totalMs / 1000).toFixed(0)}-second limit first.`
+        : `We did not check ${work.what}. Checking every one of them would have cost more time than the result is worth.`,
+    );
+  }
+  if (budget.ranOutOfTime()) {
+    limitations.push(
+      "A scan that runs out of time is usually telling you something on its own: the pages we did reach were slow enough to eat the whole budget, and a crawler working through its own budget would hit the same wall.",
+    );
+  }
 
   return {
     requestedUrl,
